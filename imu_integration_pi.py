@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import depthai as dai
 import time
+from pynput import keyboard
 
 
 def timeDeltaToMilliS(delta) -> float:
@@ -8,6 +9,27 @@ def timeDeltaToMilliS(delta) -> float:
 
 x, y, z = 0.0, 0.0, 0.0
 last_ts = None
+print_flag = False
+
+def on_press(key):
+    global print_flag
+    try:
+        # Press 'p' to print current values
+        if key.char == 'p':
+            print_flag = True
+        # Press 'r' to reset integration
+        elif key.char == 'r':
+            global x, y, z
+            x, y, z = 0.0, 0.0, 0.0
+            print("--- Integration Reset ---")
+        # Press 'q' to quit
+        elif key.char == 'q':
+            return False
+    except AttributeError:
+        pass
+
+listener = keyboard.Listener(on_press=on_press)
+listener.start()    
 
 # Create pipeline
 with dai.Pipeline() as pipeline:
@@ -25,6 +47,9 @@ with dai.Pipeline() as pipeline:
     # if lower or equal to batchReportThreshold then the sending is always blocking on device
     # useful to reduce device's CPU load  and number of lost packets, if CPU load is high on device side due to multiple nodes
     imu.setMaxBatchReports(20)
+
+    print("System Ready.")
+    print("Commands: 'p' = Print, 'r' = Reset, 'q' = Quit")
 
     imuQueue = imu.out.createOutputQueue(maxSize=50, blocking=False)
 
@@ -58,14 +83,11 @@ with dai.Pipeline() as pipeline:
             y += gyroValues.y * dt
             z += gyroValues.z * dt
 
-            imuF = "{:.06f}"
-            tsF  = "{:.03f}"
-                
-            imuF = "{:.06f}"
-            print("\n--- IMU Update ---")
-            print(f"Rotation [rad]: x: {imuF.format(x)} y: {imuF.format(y)} z: {imuF.format(z)}")
-            print(f"Rotation [deg]: x: {imuF.format(x * 180 / 3.1415)} y: {imuF.format(y * 180 / 3.1415)} z: {imuF.format(z * 180 / 3.1415)}")
-            print("------------------\n")
+            if print_flag:
+                deg = 180 / 3.14159
+                print("\n--- IMU Snapshot ---")
+                print(f"Rotation [deg]: x: {x*deg:.2f} y: {y*deg:.2f} z: {z*deg:.2f}")
+                print("--------------------")
+                print_flag = False # Reset the flag so it only prints once per press
 
-            time.sleep(0.5)
             
