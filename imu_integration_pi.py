@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+import depthai as dai
+import time
+
+
+def timeDeltaToMilliS(delta) -> float:
+    return delta.total_seconds()*1000
+
+x, y, z = 0.0, 0.0, 0.0
+last_ts = None
+
+# Create pipeline
+with dai.Pipeline() as pipeline:
+    # Define sources and outputs
+    imu = pipeline.create(dai.node.IMU)
+
+    # enable ACCELEROMETER_RAW at 500 hz rate
+    imu.enableIMUSensor(dai.IMUSensor.ACCELEROMETER_RAW, 480)
+    # enable GYROSCOPE_RAW at 400 hz rate
+    imu.enableIMUSensor(dai.IMUSensor.GYROSCOPE_RAW, 400)
+    # it's recommended to set both setBatchReportThreshold and setMaxBatchReports to 20 when integrating in a pipeline with a lot of input/output connections
+    # above this threshold packets will be sent in batch of X, if the host is not blocked and USB bandwidth is available
+    imu.setBatchReportThreshold(20)
+    # maximum number of IMU packets in a batch, if it's reached device will block sending until host can receive it
+    # if lower or equal to batchReportThreshold then the sending is always blocking on device
+    # useful to reduce device's CPU load  and number of lost packets, if CPU load is high on device side due to multiple nodes
+    imu.setMaxBatchReports(20)
+
+    imuQueue = imu.out.createOutputQueue(maxSize=50, blocking=False)
+
+    pipeline.start()
+    baseTs = None
+    while pipeline.isRunning():
+        time.sleep(0.001)
+        try:
+            imuData = imuQueue.get()
+        except KeyboardInterrupt:
+            break
+        assert isinstance(imuData, dai.IMUData)
+        imuPackets = imuData.packets
+        for imuPacket in imuPackets:
+            acceleroValues = imuPacket.acceleroMeter
+            gyroValues = imuPacket.gyroscope
+
+            current_ts = gyroValues.getTimestamp().total_seconds()
+            acceleroTs = acceleroValues.getTimestamp()
+            gyroTs = gyroValues.getTimestamp()
+
+            if last_ts is None:
+                last_ts = current_ts
+                continue
+            
+            dt = current_ts - last_ts
+            last_ts = current_ts
+
+            # Integrate
+            x += gyroValues.x * dt
+            y += gyroValues.y * dt
+            z += gyroValues.z * dt
+
+            imuF = "{:.06f}"
+            tsF  = "{:.03f}"
+                
+            imuF = "{:.06f}"
+            print("\n--- IMU Update ---")
+            print(f"Rotation [rad]: x: {imuF.format(x)} y: {imuF.format(y)} z: {imuF.format(z)}")
+            print(f"Rotation [deg]: x: {imuF.format(x * 180 / 3.1415)} y: {imuF.format(y * 180 / 3.1415)} z: {imuF.format(z * 180 / 3.1415)}")
+            print("------------------\n")
+
+            time.sleep(500)
+            

@@ -11,6 +11,14 @@ try:
     print("Connected to Brain!")
 
     while True:
+        if ser.in_waiting > 0:
+            # Read the line and clean it up
+            line = ser.read().decode()
+            if line == "?":
+                print("Signal received! Brain is ready.")
+                break
+ 
+    while True:
         user_val = input("Enter value to send (or 'q' to quit): ")
         
         if user_val.lower() == 'q':
