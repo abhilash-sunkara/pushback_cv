@@ -67,5 +67,5 @@ with dai.Pipeline() as pipeline:
             print(f"Rotation [deg]: x: {imuF.format(x * 180 / 3.1415)} y: {imuF.format(y * 180 / 3.1415)} z: {imuF.format(z * 180 / 3.1415)}")
             print("------------------\n")
 
-            time.sleep(500)
+            time.sleep(0.5)
             
